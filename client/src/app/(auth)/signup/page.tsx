@@ -57,15 +57,31 @@ export default function SignupPage() {
   const onSubmit = async (data: SignupFormData) => {
     setError(null);
     try {
+      // Log the data we're sending to help debug
+      console.log("Sending registration data:", data);
+      
       await register(data);
       toast.success("Account created successfully!");
       router.push(redirectUrl ? `/login?redirectUrl=${redirectUrl}` : "/login");
     } catch (error: AxiosError | any) {
-      toast.error("Error", {
-        description:
-          error.response?.data?.message ||
-          "Failed to create account. Please try again.",
-      });
+      console.error("Registration error:", error);
+      
+      // Show more detailed error information
+      const errorDetails = error.response?.data?.errors || [];
+      const errorMessage = error.response?.data?.message || "Failed to create account. Please try again.";
+      
+      // Display validation errors if available
+      if (errorDetails.length > 0) {
+        const validationErrors = errorDetails.map((err: any) => `${err.path}: ${err.msg}`).join(", ");
+        setError(`Validation failed: ${validationErrors}`);
+        toast.error("Registration Failed", {
+          description: `${errorMessage}: ${validationErrors}`,
+        });
+      } else {
+        toast.error("Error", {
+          description: errorMessage,
+        });
+      }
     }
   };
 

@@ -24,16 +24,76 @@ import {
   CancelBookingFormData,
 } from "@/schemas/bookings.schema";
 
+// Function to determine the best API URL to use
+const getApiUrl = () => {
+  // Use environment variable if available
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
+  // If we're in a browser context
+  if (typeof window !== 'undefined') {
+    // Check if we're on a mobile device (simplified check)
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    );
+    
+    console.log("Device detection - Mobile:", isMobile);
+    
+    // If on mobile, use the live server URL
+    if (isMobile) {
+      return "https://gohive.work/api/v1";
+    }
+  }
+  
+  // Default fallback
+  return "http://localhost:8000/api/v1";
+};
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1",
+  baseURL: getApiUrl(),
   withCredentials: true,
   timeout: 120000,
 });
 
+// Add request interceptor for better mobile compatibility
+api.interceptors.request.use(
+  (config) => {
+    // Try to get the token from localStorage for mobile compatibility
+    // This works as a fallback when cookies aren't working on mobile
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    
+    // If token exists in localStorage and no Authorization header is set, add it
+    if (token && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 export const authAPI = {
   getCurrentUser: () => api.get("/users"),
   register: (data: SignupFormData) => api.post("/users/register", data),
-  login: (data: LoginFormData) => api.post("/users/login", data),
+  login: async (data: LoginFormData) => {
+    const response = await api.post("/users/login", data);
+    
+    // Store tokens in localStorage as a backup for mobile browsers
+    if (response.data?.success && typeof window !== 'undefined') {
+      // Extract tokens from response if available (server may include them in response)
+      const accessToken = response.data?.accessToken;
+      const refreshToken = response.data?.refreshToken;
+      
+      // Store tokens in localStorage if they're available
+      if (accessToken) localStorage.setItem('accessToken', accessToken);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+    }
+    
+    return response;
+  },
   logout: () => api.post("/users/logout"),
   refreshAccessToken: () => api.post("/users/refresh-tokens"),
   verifyEmail: (token: string) => api.get(`/users/verify?token=${token}`),

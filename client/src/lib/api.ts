@@ -33,14 +33,23 @@ const getApiUrl = () => {
   
   // If we're in a browser context
   if (typeof window !== 'undefined') {
+    // Check current hostname
+    const hostname = window.location.hostname;
+    
     // Check if we're on a mobile device (simplified check)
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent
     );
     
     console.log("Device detection - Mobile:", isMobile);
+    console.log("Hostname:", hostname);
     
-    // If on mobile, use the live server URL
+    // If we're on the production domain
+    if (hostname === 'www.torqrides.com' || hostname === 'torqrides.com') {
+      return "https://gohive.work/api/v1";
+    }
+    
+    // If on mobile but not on production domain, use the live server URL
     if (isMobile) {
       return "https://gohive.work/api/v1";
     }
@@ -262,49 +271,121 @@ export const cartAPI = {
   getUserCart: () => {
     // Ensure token is attached for mobile devices
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    return api.get("/carts", token ? {
-      headers: { Authorization: `Bearer ${token}` }
-    } : undefined);
+    const isTorqRidesDomain = typeof window !== 'undefined' && 
+      (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com');
+      
+    // For production domain or mobile, always include token in header
+    if (token || isTorqRidesDomain) {
+      console.log("Adding auth header to cart request");
+      return api.get("/carts", {
+        headers: { 
+          Authorization: `Bearer ${token || ''}`,
+          'X-Requested-From': isTorqRidesDomain ? 'torqrides-production' : 'other'
+        }
+      });
+    }
+    
+    return api.get("/carts");
   },
   
   addOrUpdateMotorcycleToCart: (motorcycleId: string, data: any) => {
     // Ensure token is attached for mobile devices
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    return api.post(`/carts/item/${motorcycleId}`, data, token ? {
-      headers: { Authorization: `Bearer ${token}` }
-    } : undefined);
+    const isTorqRidesDomain = typeof window !== 'undefined' && 
+      (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com');
+    
+    // For debugging
+    console.log("Adding to cart from domain:", window?.location?.hostname);
+    console.log("Token available:", !!token);
+    
+    // For production domain or mobile, always include token in header
+    if (token || isTorqRidesDomain) {
+      console.log("Adding auth header to add-to-cart request");
+      return api.post(`/carts/item/${motorcycleId}`, data, {
+        headers: { 
+          Authorization: `Bearer ${token || ''}`,
+          'X-Requested-From': isTorqRidesDomain ? 'torqrides-production' : 'other'
+        }
+      });
+    }
+    
+    return api.post(`/carts/item/${motorcycleId}`, data);
   },
   
   removeMotorcycleFromCart: (motorcycleId: string) => {
     // Ensure token is attached for mobile devices
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    return api.delete(`/carts/item/${motorcycleId}`, token ? {
-      headers: { Authorization: `Bearer ${token}` }
-    } : undefined);
+    const isTorqRidesDomain = typeof window !== 'undefined' && 
+      (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com');
+      
+    // For production domain or mobile, always include token in header
+    if (token || isTorqRidesDomain) {
+      return api.delete(`/carts/item/${motorcycleId}`, {
+        headers: { 
+          Authorization: `Bearer ${token || ''}`,
+          'X-Requested-From': isTorqRidesDomain ? 'torqrides-production' : 'other'
+        }
+      });
+    }
+    
+    return api.delete(`/carts/item/${motorcycleId}`);
   },
   
   clearCart: () => {
     // Ensure token is attached for mobile devices
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    return api.delete("/carts/clear", token ? {
-      headers: { Authorization: `Bearer ${token}` }
-    } : undefined);
+    const isTorqRidesDomain = typeof window !== 'undefined' && 
+      (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com');
+      
+    // For production domain or mobile, always include token in header
+    if (token || isTorqRidesDomain) {
+      return api.delete("/carts/clear", {
+        headers: { 
+          Authorization: `Bearer ${token || ''}`,
+          'X-Requested-From': isTorqRidesDomain ? 'torqrides-production' : 'other'
+        }
+      });
+    }
+    
+    return api.delete("/carts/clear");
   },
 
   applyCoupon: (data: { couponCode: string }) => {
     // Ensure token is attached for mobile devices
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    return api.post("/coupons/c/apply", data, token ? {
-      headers: { Authorization: `Bearer ${token}` }
-    } : undefined);
+    const isTorqRidesDomain = typeof window !== 'undefined' && 
+      (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com');
+      
+    // For production domain or mobile, always include token in header
+    if (token || isTorqRidesDomain) {
+      return api.post("/coupons/c/apply", data, {
+        headers: { 
+          Authorization: `Bearer ${token || ''}`,
+          'X-Requested-From': isTorqRidesDomain ? 'torqrides-production' : 'other'
+        }
+      });
+    }
+    
+    return api.post("/coupons/c/apply", data);
   },
   
   removeCouponFromCart: () => {
     // Ensure token is attached for mobile devices
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    return api.post("/coupons/c/remove", {}, token ? {
-      headers: { Authorization: `Bearer ${token}` }
-    } : undefined);
+    const isTorqRidesDomain = typeof window !== 'undefined' && 
+      (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com');
+      
+    // For production domain or mobile, always include token in header
+    if (token || isTorqRidesDomain) {
+      return api.post("/coupons/c/remove", {}, {
+        headers: { 
+          Authorization: `Bearer ${token || ''}`,
+          'X-Requested-From': isTorqRidesDomain ? 'torqrides-production' : 'other'
+        }
+      });
+    }
+    
+    return api.post("/coupons/c/remove", {});
   },
 };
 
@@ -393,3 +474,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+

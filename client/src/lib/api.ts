@@ -24,6 +24,18 @@ import {
   CancelBookingFormData,
 } from "@/schemas/bookings.schema";
 
+// Helper functions for mobile/environment detection
+const isMobileDevice = () => {
+  if (typeof window === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
+const isProdDomain = () => {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  return hostname === 'www.torqrides.com' || hostname === 'torqrides.com';
+};
+
 // Function to determine the best API URL to use
 const getApiUrl = () => {
   // Use environment variable if available
@@ -33,24 +45,14 @@ const getApiUrl = () => {
   
   // If we're in a browser context
   if (typeof window !== 'undefined') {
-    // Check current hostname
+    // Log detection info
+    const mobile = isMobileDevice();
     const hostname = window.location.hostname;
-    
-    // Check if we're on a mobile device (simplified check)
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-      navigator.userAgent
-    );
-    
-    console.log("Device detection - Mobile:", isMobile);
+    console.log("Device detection - Mobile:", mobile);
     console.log("Hostname:", hostname);
     
-    // If we're on the production domain
-    if (hostname === 'www.torqrides.com' || hostname === 'torqrides.com') {
-      return "https://gohive.work/api/v1";
-    }
-    
-    // If on mobile but not on production domain, use the live server URL
-    if (isMobile) {
+    // If we're on the production domain or on a mobile device
+    if (isProdDomain() || mobile) {
       return "https://gohive.work/api/v1";
     }
   }
@@ -68,24 +70,36 @@ const api = axios.create({
 // Add request interceptor for better mobile compatibility
 api.interceptors.request.use(
   (config) => {
-    // Try to get the token from localStorage for mobile compatibility
-    // This works as a fallback when cookies aren't working on mobile
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (typeof window === 'undefined') return config;
     
-    // Force add Authorization header for all requests if token exists
-    // This ensures mobile devices always send the token
-    if (token) {
-      // Always set the Authorization header if token exists, even if it's already set
-      config.headers.Authorization = `Bearer ${token}`;
+    // Try to get the token from localStorage
+    const token = localStorage.getItem('accessToken');
+    const mobile = isMobileDevice();
+    const prod = isProdDomain();
+    
+    // Special handling for mobile devices and production domains
+    if (mobile || prod) {
+      // Always set withCredentials for CORS requests with cookies
+      config.withCredentials = true;
       
-      // Debug logging for token usage
-      if (typeof window !== 'undefined' && 
-          (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com')) {
-        console.log("Using stored token for API request:", config.url);
+      // Add Authorization header for all requests if token exists
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log(`Token attached to request: ${config.url?.split('/').pop()}`);
+      } else {
+        console.log(`No token for request: ${config.url?.split('/').pop()}`);
+        
+        // For requests that might need tokens, try a token check
+        if (config.url?.includes('/carts') || 
+            config.url?.includes('/bookings') || 
+            config.url?.includes('/users')) {
+          // Log the issue for debugging
+          console.log("Missing token for authenticated endpoint");
+        }
       }
-    } else if (typeof window !== 'undefined' && 
-               (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com')) {
-      console.log("No token available for request:", config.url);
+    } else if (token) {
+      // For non-mobile/production, still use token if available
+      config.headers.Authorization = `Bearer ${token}`;
     }
     
     return config;
@@ -99,41 +113,57 @@ export const authAPI = {
   getCurrentUser: () => api.get("/users"),
   register: (data: SignupFormData) => api.post("/users/register", data),
   login: async (data: LoginFormData) => {
-    const response = await api.post("/users/login", data);
-    
-    // Store tokens in localStorage as a backup for mobile browsers
-    if (response.data?.success && typeof window !== 'undefined') {
-      // Extract tokens from response if available (server may include them in response)
-      const accessToken = response.data?.data?.accessToken || response.data?.accessToken;
-      const refreshToken = response.data?.data?.refreshToken || response.data?.refreshToken;
+    try {
+      console.log("Attempting login...");
+      const response = await api.post("/users/login", data);
       
-      console.log("Login successful, storing tokens for mobile compatibility");
-      
-      // Store tokens in localStorage if they're available
-      if (accessToken) {
-        localStorage.setItem('accessToken', accessToken);
-        console.log("Access token stored successfully");
+      // Store tokens in localStorage regardless of device type
+      if (response.data?.success && typeof window !== 'undefined') {
+        // Extract tokens from response 
+        const accessToken = response.data?.data?.accessToken;
+        const refreshToken = response.data?.data?.refreshToken;
         
-        // For debugging on mobile
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-          navigator.userAgent
-        );
-        const isProdDomain = window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com';
+        console.log("Login successful");
+        console.log("Tokens in response:", !!accessToken, !!refreshToken);
         
-        if (isMobile || isProdDomain) {
+        // Store tokens in localStorage if they're available
+        if (accessToken) {
+          localStorage.setItem('accessToken', accessToken);
+          console.log("Access token stored in localStorage");
+        } else {
+          console.warn("No access token in response to store");
+        }
+        
+        if (refreshToken) {
+          localStorage.setItem('refreshToken', refreshToken);
+          console.log("Refresh token stored in localStorage");
+        }
+        
+        // Special handling for mobile devices or production domain
+        if (isMobileDevice() || isProdDomain()) {
           // Force a small delay before the next request to ensure token is stored
           await new Promise(resolve => setTimeout(resolve, 500));
           
-          // Force validate the token was stored
+          // Force validate the token was stored and make a test request
           const storedToken = localStorage.getItem('accessToken');
           console.log("Token verification after login:", !!storedToken);
+          
+          // Test the token with a simple request
+          try {
+            // Make a test request to the mobile-check endpoint
+            const checkResponse = await api.get('/mobile-check');
+            console.log("Mobile auth check successful:", checkResponse.data);
+          } catch (error) {
+            console.error("Mobile auth check failed:", error);
+          }
         }
       }
       
-      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      return response;
+    } catch (error) {
+      console.error("Login failed:", error);
+      throw error;
     }
-    
-    return response;
   },
   logout: async () => {
     // First try to logout via the API
@@ -449,5 +479,6 @@ api.interceptors.response.use(
 );
 
 export default api;
+
 
 

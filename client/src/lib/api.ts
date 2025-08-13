@@ -72,9 +72,20 @@ api.interceptors.request.use(
     // This works as a fallback when cookies aren't working on mobile
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     
-    // If token exists in localStorage and no Authorization header is set, add it
-    if (token && !config.headers.Authorization) {
+    // Force add Authorization header for all requests if token exists
+    // This ensures mobile devices always send the token
+    if (token) {
+      // Always set the Authorization header if token exists, even if it's already set
       config.headers.Authorization = `Bearer ${token}`;
+      
+      // Debug logging for token usage
+      if (typeof window !== 'undefined' && 
+          (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com')) {
+        console.log("Using stored token for API request:", config.url);
+      }
+    } else if (typeof window !== 'undefined' && 
+               (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com')) {
+      console.log("No token available for request:", config.url);
     }
     
     return config;
@@ -99,7 +110,26 @@ export const authAPI = {
       console.log("Login successful, storing tokens for mobile compatibility");
       
       // Store tokens in localStorage if they're available
-      if (accessToken) localStorage.setItem('accessToken', accessToken);
+      if (accessToken) {
+        localStorage.setItem('accessToken', accessToken);
+        console.log("Access token stored successfully");
+        
+        // For debugging on mobile
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        );
+        const isProdDomain = window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com';
+        
+        if (isMobile || isProdDomain) {
+          // Force a small delay before the next request to ensure token is stored
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Force validate the token was stored
+          const storedToken = localStorage.getItem('accessToken');
+          console.log("Token verification after login:", !!storedToken);
+        }
+      }
+      
       if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
     }
     
@@ -269,134 +299,41 @@ export const couponAPI = {
 
 export const cartAPI = {
   getUserCart: () => {
-    // Ensure token is attached for mobile devices
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    const isTorqRidesDomain = typeof window !== 'undefined' && 
-      (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com');
-      
-    // For production domain or mobile, always include token in header
-    if (token || isTorqRidesDomain) {
-      console.log("Adding auth header to cart request");
-      return api.get("/carts", {
-        withCredentials: true,
-        headers: { 
-          Authorization: token ? `Bearer ${token}` : '',
-          'Content-Type': 'application/json'
-          // Removed X-Requested-From header to avoid CORS issues
-        }
-      });
-    }
-    
+    // Always use the main API client with its interceptors for all requests
+    // This ensures the token is consistently applied through the interceptor
     return api.get("/carts");
   },
   
   addOrUpdateMotorcycleToCart: (motorcycleId: string, data: any) => {
-    // Ensure token is attached for mobile devices
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    const isTorqRidesDomain = typeof window !== 'undefined' && 
-      (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com');
-    
-    // For debugging
-    console.log("Adding to cart from domain:", window?.location?.hostname);
-    console.log("Token available:", !!token);
-    
-    // For production domain or mobile, always include token in header
-    if (token || isTorqRidesDomain) {
-      console.log("Adding auth header to add-to-cart request");
-      return api.post(`/carts/item/${motorcycleId}`, data, {
-        withCredentials: true,
-        headers: { 
-          Authorization: token ? `Bearer ${token}` : '',
-          'Content-Type': 'application/json'
-          // Removed X-Requested-From header to avoid CORS issues
-        }
-      });
+    // For debugging on all platforms
+    if (typeof window !== 'undefined') {
+      console.log("Adding to cart from domain:", window?.location?.hostname);
+      const token = localStorage.getItem('accessToken');
+      console.log("Token available:", !!token);
     }
     
+    // Always use the main API client with its interceptors for all requests
+    // This ensures the token is consistently applied through the interceptor
     return api.post(`/carts/item/${motorcycleId}`, data);
   },
   
   removeMotorcycleFromCart: (motorcycleId: string) => {
-    // Ensure token is attached for mobile devices
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    const isTorqRidesDomain = typeof window !== 'undefined' && 
-      (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com');
-      
-    // For production domain or mobile, always include token in header
-    if (token || isTorqRidesDomain) {
-      return api.delete(`/carts/item/${motorcycleId}`, {
-        withCredentials: true,
-        headers: { 
-          Authorization: token ? `Bearer ${token}` : '',
-          'Content-Type': 'application/json'
-          // Removed X-Requested-From header to avoid CORS issues
-        }
-      });
-    }
-    
+    // Always use the main API client with its interceptors for consistent token handling
     return api.delete(`/carts/item/${motorcycleId}`);
   },
   
   clearCart: () => {
-    // Ensure token is attached for mobile devices
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    const isTorqRidesDomain = typeof window !== 'undefined' && 
-      (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com');
-      
-    // For production domain or mobile, always include token in header
-    if (token || isTorqRidesDomain) {
-      return api.delete("/carts/clear", {
-        withCredentials: true,
-        headers: { 
-          Authorization: token ? `Bearer ${token}` : '',
-          'Content-Type': 'application/json'
-          // Removed X-Requested-From header to avoid CORS issues
-        }
-      });
-    }
-    
+    // Always use the main API client with its interceptors for consistent token handling
     return api.delete("/carts/clear");
   },
 
   applyCoupon: (data: { couponCode: string }) => {
-    // Ensure token is attached for mobile devices
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    const isTorqRidesDomain = typeof window !== 'undefined' && 
-      (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com');
-      
-    // For production domain or mobile, always include token in header
-    if (token || isTorqRidesDomain) {
-      return api.post("/coupons/c/apply", data, {
-        withCredentials: true,
-        headers: { 
-          Authorization: token ? `Bearer ${token}` : '',
-          'Content-Type': 'application/json'
-          // Removed X-Requested-From header to avoid CORS issues
-        }
-      });
-    }
-    
+    // Always use the main API client with its interceptors for consistent token handling
     return api.post("/coupons/c/apply", data);
   },
   
   removeCouponFromCart: () => {
-    // Ensure token is attached for mobile devices
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    const isTorqRidesDomain = typeof window !== 'undefined' && 
-      (window.location.hostname === 'www.torqrides.com' || window.location.hostname === 'torqrides.com');
-      
-    // For production domain or mobile, always include token in header
-    if (token || isTorqRidesDomain) {
-      return api.post("/coupons/c/remove", {}, {
-        withCredentials: true,
-        headers: { 
-          Authorization: token ? `Bearer ${token}` : '',
-          'Content-Type': 'application/json'
-          // Removed X-Requested-From header to avoid CORS issues
-        }
-      });
-    }
-    
+    // Always use the main API client with its interceptors for consistent token handling
     return api.post("/coupons/c/remove", {});
   },
 };
@@ -472,7 +409,33 @@ api.interceptors.response.use(
       error?.config?.url?.includes("/carts")
     ) {
       console.error("Cart operation failed due to authentication issue");
-      // Structured error for better handling
+      
+      // Check if this is likely a mobile device
+      const isMobile = typeof window !== 'undefined' && 
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      // If mobile, try to recover by forcing user to login page
+      if (isMobile && typeof window !== 'undefined') {
+        // Store current page URL in localStorage to redirect back after login
+        const currentPath = window.location.pathname + window.location.search;
+        localStorage.setItem('redirectAfterLogin', currentPath);
+        
+        console.log("Mobile auth failure detected - redirecting to login");
+        
+        // Force navigation to login page with redirect parameter
+        window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&auth=expired`;
+        
+        // Return a special error that the UI can handle gracefully
+        return Promise.reject({
+          ...error,
+          isAuthError: true,
+          cartOperation: true,
+          redirected: true,
+          message: "Redirecting to login page..."
+        });
+      }
+      
+      // Standard error for non-mobile devices
       return Promise.reject({
         ...error,
         isAuthError: true,
@@ -486,4 +449,5 @@ api.interceptors.response.use(
 );
 
 export default api;
+
 

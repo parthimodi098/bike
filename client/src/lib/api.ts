@@ -278,9 +278,11 @@ export const cartAPI = {
     if (token || isTorqRidesDomain) {
       console.log("Adding auth header to cart request");
       return api.get("/carts", {
+        withCredentials: true,
         headers: { 
-          Authorization: `Bearer ${token || ''}`,
-          'X-Requested-From': isTorqRidesDomain ? 'torqrides-production' : 'other'
+          Authorization: token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+          // Removed X-Requested-From header to avoid CORS issues
         }
       });
     }
@@ -302,9 +304,11 @@ export const cartAPI = {
     if (token || isTorqRidesDomain) {
       console.log("Adding auth header to add-to-cart request");
       return api.post(`/carts/item/${motorcycleId}`, data, {
+        withCredentials: true,
         headers: { 
-          Authorization: `Bearer ${token || ''}`,
-          'X-Requested-From': isTorqRidesDomain ? 'torqrides-production' : 'other'
+          Authorization: token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+          // Removed X-Requested-From header to avoid CORS issues
         }
       });
     }
@@ -321,9 +325,11 @@ export const cartAPI = {
     // For production domain or mobile, always include token in header
     if (token || isTorqRidesDomain) {
       return api.delete(`/carts/item/${motorcycleId}`, {
+        withCredentials: true,
         headers: { 
-          Authorization: `Bearer ${token || ''}`,
-          'X-Requested-From': isTorqRidesDomain ? 'torqrides-production' : 'other'
+          Authorization: token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+          // Removed X-Requested-From header to avoid CORS issues
         }
       });
     }
@@ -340,9 +346,11 @@ export const cartAPI = {
     // For production domain or mobile, always include token in header
     if (token || isTorqRidesDomain) {
       return api.delete("/carts/clear", {
+        withCredentials: true,
         headers: { 
-          Authorization: `Bearer ${token || ''}`,
-          'X-Requested-From': isTorqRidesDomain ? 'torqrides-production' : 'other'
+          Authorization: token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+          // Removed X-Requested-From header to avoid CORS issues
         }
       });
     }
@@ -359,9 +367,11 @@ export const cartAPI = {
     // For production domain or mobile, always include token in header
     if (token || isTorqRidesDomain) {
       return api.post("/coupons/c/apply", data, {
+        withCredentials: true,
         headers: { 
-          Authorization: `Bearer ${token || ''}`,
-          'X-Requested-From': isTorqRidesDomain ? 'torqrides-production' : 'other'
+          Authorization: token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+          // Removed X-Requested-From header to avoid CORS issues
         }
       });
     }
@@ -378,9 +388,11 @@ export const cartAPI = {
     // For production domain or mobile, always include token in header
     if (token || isTorqRidesDomain) {
       return api.post("/coupons/c/remove", {}, {
+        withCredentials: true,
         headers: { 
-          Authorization: `Bearer ${token || ''}`,
-          'X-Requested-From': isTorqRidesDomain ? 'torqrides-production' : 'other'
+          Authorization: token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+          // Removed X-Requested-From header to avoid CORS issues
         }
       });
     }

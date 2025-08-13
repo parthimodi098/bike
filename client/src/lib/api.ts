@@ -84,8 +84,10 @@ export const authAPI = {
     // Store tokens in localStorage as a backup for mobile browsers
     if (response.data?.success && typeof window !== 'undefined') {
       // Extract tokens from response if available (server may include them in response)
-      const accessToken = response.data?.accessToken;
-      const refreshToken = response.data?.refreshToken;
+      const accessToken = response.data?.data?.accessToken || response.data?.accessToken;
+      const refreshToken = response.data?.data?.refreshToken || response.data?.refreshToken;
+      
+      console.log("Login successful, storing tokens for mobile compatibility");
       
       // Store tokens in localStorage if they're available
       if (accessToken) localStorage.setItem('accessToken', accessToken);
@@ -94,8 +96,39 @@ export const authAPI = {
     
     return response;
   },
-  logout: () => api.post("/users/logout"),
-  refreshAccessToken: () => api.post("/users/refresh-tokens"),
+  logout: async () => {
+    // First try to logout via the API
+    try {
+      await api.post("/users/logout");
+    } catch (error) {
+      console.log("Logout API call failed, continuing with local cleanup");
+    } finally {
+      // Always clear localStorage tokens for mobile compatibility
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        console.log("Cleared localStorage tokens during logout");
+      }
+    }
+  },
+  refreshAccessToken: async () => {
+    const response = await api.post("/users/refresh-tokens");
+    
+    // Store tokens in localStorage as a backup for mobile browsers
+    if (response?.data?.success && typeof window !== 'undefined') {
+      // Extract tokens from response
+      const accessToken = response.data?.data?.accessToken || response.data?.accessToken;
+      const refreshToken = response.data?.data?.refreshToken || response.data?.refreshToken;
+      
+      console.log("Token refresh successful, updating stored tokens");
+      
+      // Store tokens in localStorage if they're available
+      if (accessToken) localStorage.setItem('accessToken', accessToken);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+    }
+    
+    return response;
+  },
   verifyEmail: (token: string) => api.get(`/users/verify?token=${token}`),
   forgotPasswordRequest: (data: ForgotPasswordFormData) =>
     api.post("/users/forgot-password", data),
@@ -226,45 +259,133 @@ export const couponAPI = {
 };
 
 export const cartAPI = {
-  getUserCart: () => api.get("/carts"),
-  addOrUpdateMotorcycleToCart: (motorcycleId: string, data: any) =>
-    api.post(`/carts/item/${motorcycleId}`, data),
-  removeMotorcycleFromCart: (motorcycleId: string) =>
-    api.delete(`/carts/item/${motorcycleId}`),
-  clearCart: () => api.delete("/carts/clear"),
+  getUserCart: () => {
+    // Ensure token is attached for mobile devices
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    return api.get("/carts", token ? {
+      headers: { Authorization: `Bearer ${token}` }
+    } : undefined);
+  },
+  
+  addOrUpdateMotorcycleToCart: (motorcycleId: string, data: any) => {
+    // Ensure token is attached for mobile devices
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    return api.post(`/carts/item/${motorcycleId}`, data, token ? {
+      headers: { Authorization: `Bearer ${token}` }
+    } : undefined);
+  },
+  
+  removeMotorcycleFromCart: (motorcycleId: string) => {
+    // Ensure token is attached for mobile devices
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    return api.delete(`/carts/item/${motorcycleId}`, token ? {
+      headers: { Authorization: `Bearer ${token}` }
+    } : undefined);
+  },
+  
+  clearCart: () => {
+    // Ensure token is attached for mobile devices
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    return api.delete("/carts/clear", token ? {
+      headers: { Authorization: `Bearer ${token}` }
+    } : undefined);
+  },
 
-  applyCoupon: (data: { couponCode: string }) =>
-    api.post("/coupons/c/apply", data),
-  removeCouponFromCart: () => api.post("/coupons/c/remove"),
+  applyCoupon: (data: { couponCode: string }) => {
+    // Ensure token is attached for mobile devices
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    return api.post("/coupons/c/apply", data, token ? {
+      headers: { Authorization: `Bearer ${token}` }
+    } : undefined);
+  },
+  
+  removeCouponFromCart: () => {
+    // Ensure token is attached for mobile devices
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    return api.post("/coupons/c/remove", {}, token ? {
+      headers: { Authorization: `Bearer ${token}` }
+    } : undefined);
+  },
 };
 
 let refreshingTokenInProgress = false;
+let refreshAttempts = 0;
+const MAX_REFRESH_ATTEMPTS = 2;
 
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    console.log("API Error:", error?.response?.status, error?.config?.url);
+    
+    // Handle refresh token endpoint failure
     if (error?.config?.url?.includes("refresh-token")) {
+      console.log("Refresh token failed, redirecting to login");
       localStorage.setItem("auth-storage", JSON.stringify(initialAuthState));
       localStorage.setItem("cart-storage", JSON.stringify(initialCartState));
-      window.location.href = "/login";
+      
+      // Clear any stored tokens
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      
+      // Only redirect if in browser context
+      if (typeof window !== 'undefined') {
+        window.location.href = "/login";
+      }
       return Promise.reject(error);
     }
 
+    // Handle 401 errors (unauthorized/session expired)
     if (
       error?.response?.status === 401 &&
       !error?.config?.url?.includes("login") &&
+      refreshAttempts < MAX_REFRESH_ATTEMPTS &&
       !refreshingTokenInProgress
     ) {
-      /* Refreshing the token */
+      console.log("Session expired, attempting token refresh");
       refreshingTokenInProgress = true;
+      refreshAttempts++;
 
-      const response = await authAPI.refreshAccessToken();
-
-      refreshingTokenInProgress = false;
-
-      if (!(response instanceof ApiError)) {
-        return axios(error.config);
+      try {
+        // Try to refresh the token
+        const response = await authAPI.refreshAccessToken();
+        
+        // Reset attempts on success
+        refreshAttempts = 0;
+        refreshingTokenInProgress = false;
+        
+        // If token refresh was successful, retry the original request
+        if (!(response instanceof ApiError)) {
+          console.log("Token refresh successful, retrying request");
+          
+          // Make sure the retried request includes the token in Authorization header
+          const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+          if (token && error.config) {
+            error.config.headers = error.config.headers || {};
+            error.config.headers.Authorization = `Bearer ${token}`;
+          }
+          
+          return axios(error.config);
+        }
+      } catch (refreshError) {
+        console.error("Token refresh failed:", refreshError);
       }
+      
+      refreshingTokenInProgress = false;
+    }
+    
+    // For mobile cart operations, provide a more specific error message
+    if (
+      error?.response?.status === 401 &&
+      error?.config?.url?.includes("/carts")
+    ) {
+      console.error("Cart operation failed due to authentication issue");
+      // Structured error for better handling
+      return Promise.reject({
+        ...error,
+        isAuthError: true,
+        cartOperation: true,
+        message: "Please log in again to continue shopping"
+      });
     }
 
     return Promise.reject(error);

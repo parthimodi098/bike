@@ -139,13 +139,16 @@ export const useCartStore = create<CartState>()(
         try {
           const response = await cartAPI.applyCoupon({ couponCode });
           const cart = response.data.data;
-          set({ loading: false, cart: response.data.data });
-          if (cart.cartTotal < cart.discountedTotal) {
+          set({ loading: false, cart: cart });
+          
+          // Calculate discount amount for success message
+          const discountAmount = cart.rentTotal + cart.totalTax - cart.discountedRentTotal;
+          if (discountAmount > 0) {
             toast.success(
-              `Coupon Applied. Discount: ${
-                cart.discountedTotal - cart.cartTotal
-              }`
+              `Coupon Applied! You saved ₹${Math.round(discountAmount)}`
             );
+          } else {
+            toast.success("Coupon applied successfully");
           }
         } catch (error: AxiosError | any) {
           set({
@@ -176,3 +179,4 @@ export const useCartStore = create<CartState>()(
     }
   )
 );
+

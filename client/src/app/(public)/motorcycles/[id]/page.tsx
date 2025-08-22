@@ -200,7 +200,7 @@ const calculateTotalCost = () => {
      !watchedDropoffTime ||
      !watchedQuantity
    ) {
-     return { totalCost: 0, duration: "N/A" };
+     return { totalCost: 0, duration: "N/A", breakdown: null };
    }
 
    const bookingPeriod = getBookingPeriod(
@@ -211,35 +211,55 @@ const calculateTotalCost = () => {
    );
 
    if (bookingPeriod.totalHours <= 0) {
-     return { totalCost: 0, duration: "0 days 0 hours" };
+     return { totalCost: 0, duration: "0 days 0 hours", breakdown: null };
    }
 
    const { weekdayCount, weekendCount, extraHours, lastDayTypeForExtraHours } =
      bookingPeriod;
 
    let totalCost = 0;
-   totalCost += weekdayCount * motorcycle.pricePerDayMonThu;
-   totalCost += weekendCount * motorcycle.pricePerDayFriSun;
+   const weekdayTotal = weekdayCount * motorcycle.pricePerDayMonThu;
+   const weekendTotal = weekendCount * motorcycle.pricePerDayFriSun;
+   
+   totalCost += weekdayTotal + weekendTotal;
 
+   let extraHoursCost = 0;
    if (extraHours > 0) {
      const extraHourRate =
        lastDayTypeForExtraHours === "weekday"
          ? motorcycle.pricePerDayMonThu
          : motorcycle.pricePerDayFriSun;
+     
+     // Fixed calculation to match server logic
      if (extraHours >= 5) {
-       totalCost += extraHourRate;
+       extraHoursCost = extraHourRate;
      } else {
-       totalCost += extraHourRate * 0.1 * extraHours; 
+       extraHoursCost = Math.ceil((extraHourRate / 24) * extraHours);
      }
+     totalCost += extraHoursCost;
    }
+
+   const breakdown = {
+     weekdayCount,
+     weekendCount,
+     extraHours,
+     weekdayRate: motorcycle.pricePerDayMonThu,
+     weekendRate: motorcycle.pricePerDayFriSun,
+     weekdayTotal,
+     weekendTotal,
+     extraHoursCost,
+     subtotal: totalCost,
+     lastDayTypeForExtraHours
+   };
 
    return {
      totalCost: totalCost * watchedQuantity,
      duration: bookingPeriod.duration,
+     breakdown
    };
  };
  
-  const { totalCost, duration } = calculateTotalCost();
+  const { totalCost, duration, breakdown } = calculateTotalCost();
 
   const onCartSubmit = async (data: AddToCartFormData) => {
     if (user?.role === UserRolesEnum.ADMIN) {
@@ -827,16 +847,60 @@ const calculateTotalCost = () => {
                   )}
 
                   {totalCost > 0 && (
-                    <div className="p-4 dark:bg-transparent border-2 rounded-xl">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">Total Cost:</span>
-                        <span className="text-2xl font-bold text-primary">
-                          ₹{totalCost.toFixed(2)}
-                        </span>
+                    <div className="space-y-3">
+                      <div className="p-4 dark:bg-transparent border-2 rounded-xl">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium">Total Cost:</span>
+                          <span className="text-2xl font-bold text-primary">
+                            ₹{totalCost.toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-sm dark:text-white mt-1">
+                          Duration: {duration} {watchedQuantity > 1 && `(${watchedQuantity} motorcycles)`}
+                        </p>
+                        
+                        {/* Price breakdown */}
+                        {breakdown && (breakdown.weekdayCount > 0 || breakdown.weekendCount > 0) && (
+                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Price Breakdown:</p>
+                            <div className="space-y-1 text-xs">
+                              {breakdown.weekdayCount > 0 && (
+                                <div className="flex justify-between">
+                                  <span>{breakdown.weekdayCount} weekday{breakdown.weekdayCount > 1 ? 's' : ''} @ ₹{breakdown.weekdayRate}/day:</span>
+                                  <span>₹{breakdown.weekdayTotal}</span>
+                                </div>
+                              )}
+                              {breakdown.weekendCount > 0 && (
+                                <div className="flex justify-between">
+                                  <span>{breakdown.weekendCount} weekend day{breakdown.weekendCount > 1 ? 's' : ''} @ ₹{breakdown.weekendRate}/day:</span>
+                                  <span>₹{breakdown.weekendTotal}</span>
+                                </div>
+                              )}
+                              {breakdown.extraHours > 0 && (
+                                <div className="flex justify-between">
+                                  <span>
+                                    {breakdown.extraHours} extra hour{breakdown.extraHours > 1 ? 's' : ''} 
+                                    ({breakdown.lastDayTypeForExtraHours} rate):
+                                  </span>
+                                  <span>₹{breakdown.extraHoursCost}</span>
+                                </div>
+                              )}
+                              {watchedQuantity > 1 && (
+                                <>
+                                  <div className="flex justify-between border-t pt-1">
+                                    <span>Subtotal per bike:</span>
+                                    <span>₹{breakdown.subtotal}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Quantity: {watchedQuantity} bikes</span>
+                                    <span>₹{breakdown.subtotal * watchedQuantity}</span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-sm dark:text-whit mt-1">
-                        Duration: {duration} {watchedQuantity>1 && `(${watchedQuantity} motorcycles)`}
-                      </p>
                     </div>
                   )}
 

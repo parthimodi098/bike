@@ -121,10 +121,13 @@ export default function CartPage() {
     if (extraHours > 0) {
       const extraHourRate =
         lastDayTypeForExtraHours === "weekday" ? weekdayRate : weekendRate;
-      if (extraHours <= 4) {
-        extraHoursCharges = extraHourRate * 0.1;
-      } else {
+      
+      // Fixed calculation: If extra hours are >= 5, charge full day rate
+      // Otherwise charge hourly rate (1/24th of daily rate per hour)
+      if (extraHours >= 5) {
         extraHoursCharges = extraHourRate;
+      } else {
+        extraHoursCharges = Math.ceil((extraHourRate / 24) * extraHours);
       }
       calculatedRent += extraHoursCharges;
     }

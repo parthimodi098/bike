@@ -182,6 +182,11 @@ export const useBookingStore = create<BookingState>((set, get) => ({
         loading: false,
         metadata: { ...state.metadata, total: state.metadata.total + 1 },
       }));
+      
+      // Refresh analytics after adding a booking
+      const { getDashboardStats, getSalesOverview } = get();
+      getDashboardStats();
+      getSalesOverview({ view: "monthly" });
     } catch (error: AxiosError | any) {
       set({
         loading: false,
@@ -309,18 +314,19 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     try {
       const response = await bookingAPI.getDashboardStats();
       const statsData = response.data.data;
+      console.log("Dashboard stats received:", statsData);
       set((state) => ({
         analytics: { ...state.analytics, stats: statsData },
         loading: false,
       }));
     } catch (error: AxiosError | any) {
+      const errorMsg = error.response?.data?.message || "Failed to fetch analytics";
+      console.error("Dashboard stats error:", error);
       set({
         loading: false,
-        error: error.response?.data?.message || "Failed to fetch analytics",
+        error: errorMsg,
       });
       throw error;
-    } finally {
-      set({ loading: false });
     }
   },
 
@@ -329,18 +335,20 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     try {
       const response = await bookingAPI.getSalesOverview(params);
       const salesData = response.data.data;
+      console.log("Sales overview received:", salesData);
       set((state) => ({
         analytics: { ...state.analytics, salesOverview: salesData },
         loading: false,
       }));
     } catch (error: AxiosError | any) {
+      const errorMsg = error.response?.data?.message || "Failed to fetch analytics";
+      console.error("Sales overview error:", error);
       set({
         loading: false,
-        error: error.response?.data?.message || "Failed to fetch analytics",
+        error: errorMsg,
       });
       throw error;
-    } finally {
-      set({ loading: false });
     }
   },
 }));
+

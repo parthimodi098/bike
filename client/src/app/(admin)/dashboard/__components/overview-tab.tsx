@@ -213,7 +213,7 @@ import {
   Legend,
   Cell,
 } from "recharts";
-import { DollarSign, Bike, Users, BookCopy } from "lucide-react";
+import { DollarSign, Bike, Users, BookCopy, Eye } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -221,6 +221,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { format } from "date-fns";
 
 // Stat Card Component for the top section
 const StatCard = ({
@@ -258,14 +270,27 @@ const StatCard = ({
 );
 
 export default function OverviewTab() {
-  const { analytics, loading, getDashboardStats, getSalesOverview } =
+  const { analytics, loading, getDashboardStats, getSalesOverview, getAllBookings, bookings } =
     useBookingStore();
   const { stats, salesOverview } = analytics;
   const [salesView, setSalesView] = useState<"monthly" | "yearly">("monthly");
 
+  // Refresh dashboard stats when component mounts or becomes active
   useEffect(() => {
-    getDashboardStats();
-  }, [getDashboardStats]);
+    const refreshAnalytics = () => {
+      getDashboardStats();
+      getSalesOverview({ view: salesView });
+      // Fetch recent bookings (limit to 5 most recent)
+      getAllBookings({ page: 1, offset: 5, sortBy: 'createdAt', sortOrder: 'desc' });
+    };
+
+    refreshAnalytics();
+    
+    // Set up interval to refresh every 30 seconds for live updates
+    const interval = setInterval(refreshAnalytics, 30000);
+    
+    return () => clearInterval(interval);
+  }, [getDashboardStats, getSalesOverview, getAllBookings, salesView]);
 
   useEffect(() => {
     getSalesOverview({ view: salesView });
@@ -333,16 +358,53 @@ export default function OverviewTab() {
     );
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "PENDING":
+        return "bg-yellow-500";
+      case "CONFIRMED":
+        return "bg-blue-500";
+      case "STARTED":
+        return "bg-green-500";
+      case "COMPLETED":
+        return "bg-gray-500";
+      case "CANCELLED":
+        return "bg-red-500";
+      default:
+        return "bg-gray-500";
+    }
+  };
+
   if (loading && !salesOverview.length && !stats.totalRevenue) {
     return (
       <div className="flex justify-center items-center h-96">
-        <p>Loading analytics...</p>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p>Loading analytics...</p>
+        </div>
       </div>
     );
   }
 
+  // Debug: Log data for troubleshooting
+  console.log("Analytics Data:", { stats, salesOverview });
+
   return (
     <div className="space-y-6">
+      {/* Debug Info Card - Remove in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardContent className="p-4">
+            <h4 className="font-semibold text-yellow-800">Debug Info:</h4>
+            <p className="text-sm text-yellow-700">
+              Revenue: ₹{stats.totalRevenue?.toLocaleString() || 0} | 
+              Bookings: {stats.totalBookings || 0} | 
+              Sales Data Points: {salesOverview?.length || 0} |
+              Categories: {stats.motorcycleCategories?.length || 0}
+            </p>
+          </CardContent>
+        </Card>
+      )}
       {/* Stat Cards Section */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((card) => (
@@ -457,6 +519,71 @@ export default function OverviewTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Recent Bookings Section */}
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle>Recent Bookings</CardTitle>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/all-bookings">
+                <Eye className="h-4 w-4 mr-2" />
+                View All
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading && bookings.length === 0 ? (
+            <p>Loading recent bookings...</p>
+          ) : bookings.length === 0 ? (
+            <p>No bookings found.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Booking ID</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bookings.slice(0, 5).map((booking) => (
+                  <TableRow key={booking._id}>
+                    <TableCell className="font-medium">
+                      {booking._id.slice(-6).toUpperCase()}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{booking.customer.fullname}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {booking.customer.email}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={`${getStatusColor(booking.status)} text-white`}
+                      >
+                        {booking.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      ₹{booking.paidAmount.toLocaleString("en-IN")}
+                    </TableCell>
+                    <TableCell>
+                      {format(new Date(booking.bookingDate), "MMM dd, yyyy")}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
+

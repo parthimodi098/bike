@@ -254,6 +254,12 @@ function DashboardComponent() {
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     router.push(`/dashboard?tab=${value}`, { scroll: true });
+    
+    // Refresh analytics when switching to overview tab
+    if (value === "overview") {
+      getDashboardStats();
+      getSalesOverview();
+    }
   };
 
   useEffect(() => {
@@ -465,3 +471,4 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
+

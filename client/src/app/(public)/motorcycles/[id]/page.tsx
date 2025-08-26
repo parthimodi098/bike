@@ -52,8 +52,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import TimePickerPopover from "@/app/__components/select-time";
-import { getBookingPeriod, getTodayPrice } from "@/lib/utils";
-import { calculateRent } from "@/lib/pricing";
+import { getBookingPeriod, getTodayPrice, calculateRent } from "@/lib/utils";
 
 export default function MotorcycleDetailPage() {
   const pathname = usePathname();

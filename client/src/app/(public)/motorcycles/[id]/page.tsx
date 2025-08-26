@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/select";
 import TimePickerPopover from "@/app/__components/select-time";
 import { getBookingPeriod, getTodayPrice } from "@/lib/utils";
+import { calculateRent } from "@/lib/pricing";
 
 export default function MotorcycleDetailPage() {
   const pathname = usePathname();
@@ -214,61 +215,47 @@ const calculateTotalCost = () => {
      return { totalCost: 0, duration: "0 days 0 hours", breakdown: null };
    }
 
-   const totalHours = bookingPeriod.totalHours;
+   // Calculate rent based on weekday/weekend pricing
+   const calculatedRent = calculateRent(
+     bookingPeriod,
+     motorcycle.pricePerDayMonThu,
+     motorcycle.pricePerDayFriSun
+   );
    
-   // Use weekday rate as the standard daily rental (you can modify this logic as needed)
-   const dailyRental = motorcycle.pricePerDayMonThu;
-   
-   let baseCost = 0;
+   // Calculate extra hours cost separately for breakdown display
    let extraHoursCost = 0;
-   let extraDaysCost = 0;
-   let fullDaysCharged = 0;
-   let extraHoursCharged = 0;
-
-   // NEW CALCULATION LOGIC
-   if (totalHours <= 24) {
-     // Case 1: Up to 24 hours = One full day rental (minimum 6 hours = full day)
-     baseCost = dailyRental;
-     fullDaysCharged = 1;
-   } else {
-     // Case 2: More than 24 hours
-     const fullDays = Math.floor(totalHours / 24);
-     const remainingHours = totalHours % 24;
+   if (bookingPeriod.extraHours > 0) {
+     const extraHourRate = bookingPeriod.lastDayTypeForExtraHours === "weekday" 
+       ? motorcycle.pricePerDayMonThu 
+       : motorcycle.pricePerDayFriSun;
      
-     baseCost = fullDays * dailyRental;
-     fullDaysCharged = fullDays;
-     
-     if (remainingHours > 0) {
-       if (remainingHours <= 4) {
-         // Extra hours (1-4): 10% of daily rental per hour
-         extraHoursCost = Math.ceil(remainingHours) * (dailyRental * 0.10);
-         extraHoursCharged = Math.ceil(remainingHours);
-       } else {
-         // More than 4 hours = charge full additional day
-         extraDaysCost = dailyRental;
-         fullDaysCharged += 1;
-       }
+     if (bookingPeriod.extraHours >= 5) {
+       // More than 5 hours = charge full additional day
+       extraHoursCost = extraHourRate;
+     } else {
+       // Less than 5 hours = charge hourly rate (1/24th of daily rate per hour)
+       extraHoursCost = Math.ceil((extraHourRate / 24) * bookingPeriod.extraHours);
      }
    }
 
-   const subtotal = baseCost + extraHoursCost + extraDaysCost;
+   const subtotal = calculatedRent;
    const gstRate = 0.18; // 18% GST
    const gstAmount = subtotal * gstRate;
    const totalWithGST = subtotal + gstAmount;
 
    const breakdown = {
-     dailyRental,
-     fullDaysCharged,
-     extraHoursCharged,
-     baseCost,
+     weekdayRate: motorcycle.pricePerDayMonThu,
+     weekendRate: motorcycle.pricePerDayFriSun,
+     weekdayCount: bookingPeriod.weekdayCount,
+     weekendCount: bookingPeriod.weekendCount,
+     extraHours: bookingPeriod.extraHours,
      extraHoursCost,
-     extraDaysCost,
      subtotal,
      gstRate: gstRate * 100, // Show as percentage
      gstAmount,
      totalWithGST,
-     totalHours: Math.ceil(totalHours),
-     calculation: `${fullDaysCharged} day(s)${extraHoursCharged > 0 ? ` + ${extraHoursCharged} extra hour(s)` : ''}${extraDaysCost > 0 ? ` + 1 additional day` : ''}`
+     totalHours: Math.ceil(bookingPeriod.totalHours),
+     calculation: `${bookingPeriod.weekdayCount} weekday(s) × ₹${motorcycle.pricePerDayMonThu} + ${bookingPeriod.weekendCount} weekend day(s) × ₹${motorcycle.pricePerDayFriSun}${bookingPeriod.extraHours > 0 ? ` + ${bookingPeriod.extraHours} extra hour(s)` : ''}`
    };
 
    return {
@@ -878,10 +865,14 @@ const calculateTotalCost = () => {
                           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
                             <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Price Breakdown:</p>
                             <div className="space-y-1 text-xs">
-                              <div className="flex justify-between">
-                                <span>Daily Rental Rate:</span>
-                                <span>₹{breakdown.dailyRental.toLocaleString()}</span>
-                              </div>
+                                                             <div className="flex justify-between">
+                                 <span>Weekday Rate:</span>
+                                 <span>₹{breakdown.weekdayRate.toLocaleString()}</span>
+                               </div>
+                               <div className="flex justify-between">
+                                 <span>Weekend Rate:</span>
+                                 <span>₹{breakdown.weekendRate.toLocaleString()}</span>
+                               </div>
                               <div className="flex justify-between">
                                 <span>Total Hours:</span>
                                 <span>{breakdown.totalHours}</span>
@@ -891,24 +882,24 @@ const calculateTotalCost = () => {
                                 <span className="text-right">{breakdown.calculation}</span>
                               </div>
                               
-                              {breakdown.baseCost > 0 && (
+                              {breakdown.weekdayCount > 0 && (
                                 <div className="flex justify-between">
-                                  <span>{breakdown.fullDaysCharged} full day{breakdown.fullDaysCharged > 1 ? 's' : ''}:</span>
-                                  <span>₹{breakdown.baseCost.toLocaleString()}</span>
+                                  <span>{breakdown.weekdayCount} weekday{breakdown.weekdayCount > 1 ? 's' : ''}:</span>
+                                  <span>₹{(breakdown.weekdayCount * breakdown.weekdayRate).toLocaleString()}</span>
                                 </div>
                               )}
-                              
+
+                              {breakdown.weekendCount > 0 && (
+                                <div className="flex justify-between">
+                                  <span>{breakdown.weekendCount} weekend day{breakdown.weekendCount > 1 ? 's' : ''}:</span>
+                                  <span>₹{(breakdown.weekendCount * breakdown.weekendRate).toLocaleString()}</span>
+                                </div>
+                              )}
+
                               {breakdown.extraHoursCost > 0 && (
                                 <div className="flex justify-between">
-                                  <span>{breakdown.extraHoursCharged} extra hour{breakdown.extraHoursCharged > 1 ? 's' : ''} (10% each):</span>
+                                  <span>{breakdown.extraHours} extra hour{breakdown.extraHours > 1 ? 's' : ''}:</span>
                                   <span>₹{breakdown.extraHoursCost.toLocaleString()}</span>
-                                </div>
-                              )}
-                              
-                              {breakdown.extraDaysCost > 0 && (
-                                <div className="flex justify-between">
-                                  <span>Additional full day (&gt;4 hours):</span>
-                                  <span>₹{breakdown.extraDaysCost.toLocaleString()}</span>
                                 </div>
                               )}
                               

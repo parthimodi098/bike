@@ -88,33 +88,27 @@ export const getBookingPeriod = (
   // For 24-28 hours: Count only full days (extra hours are charged separately)
   const totalDaysToCharge = (totalHours >= 28 && originalExtraHours > 0) ? fullDays + 1 : fullDays;
 
-  // If pickup is Thursday after 4pm, all days are weekend pricing
-  if (isWeekendPricing) {
-    weekendCount = totalDaysToCharge; // Count all days as weekend
-    lastDayTypeForExtraHours = "weekend";
-  } else {
-    // Day-by-day calculation based on actual calendar days
-    let currentDate = new Date(pickupDateTime);
+  // Always do day-by-day calculation based on actual calendar days
+  let currentDate = new Date(pickupDateTime);
+  
+  // Count days based on totalDaysToCharge
+  for (let i = 0; i < totalDaysToCharge; i++) {
+    const dayOfWeek = currentDate.getDay();
     
-    // Count days based on totalDaysToCharge
-    for (let i = 0; i < totalDaysToCharge; i++) {
-      const dayOfWeek = currentDate.getDay();
-      
-      // Monday to Thursday = weekday, Friday to Sunday = weekend
-      if (dayOfWeek >= 1 && dayOfWeek <= 4) {
-        weekdayCount++;
-      } else {
-        weekendCount++;
-      }
-      
-      currentDate.setDate(currentDate.getDate() + 1);
+    // Monday to Thursday = weekday, Friday to Sunday = weekend
+    if (dayOfWeek >= 1 && dayOfWeek <= 4) {
+      weekdayCount++;
+    } else {
+      weekendCount++;
     }
     
-    // For 24-28 hours, determine type for extra hours
-    if (totalHours > 24 && totalHours < 28 && originalExtraHours > 0) {
-      const extraHoursDay = currentDate.getDay();
-      lastDayTypeForExtraHours = (extraHoursDay >= 1 && extraHoursDay <= 4) ? "weekday" : "weekend";
-    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  // For 24-28 hours, determine type for extra hours
+  if (totalHours > 24 && totalHours < 28 && originalExtraHours > 0) {
+    const extraHoursDay = currentDate.getDay();
+    lastDayTypeForExtraHours = (extraHoursDay >= 1 && extraHoursDay <= 4) ? "weekday" : "weekend";
   }
 
   // Set extraHours based on the rules
@@ -185,5 +179,6 @@ export const getTodayPrice = (motorcycle: Motorcycle) => {
   if (day >= 1 && day <= 4) return motorcycle.pricePerDayMonThu;
   else return motorcycle.pricePerDayFriSun;
 };
+
 
 

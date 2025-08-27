@@ -58,122 +58,81 @@ export const getBookingPeriod = (
   }
 
   const totalHours = diff / (1000 * 60 * 60);
-  const fullDays = Math.floor(totalHours / 24);
-  const extraHours = totalHours % 24;
+  
+  // Determine pricing type based on pickup day and time
+  const pickupDay = pickupDateTime.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+  const pickupHour = pickupDateTime.getHours();
+  
+  // WEEKDAY: Monday 9am to Thursday 3pm (15:00)
+  // WEEKEND: Thursday 4pm onwards + Friday + Saturday + Sunday (till 9pm)
+  let isWeekendPricing = false;
+  
+  if (pickupDay === 4 && pickupHour >= 16) { // Thursday 4pm onwards
+    isWeekendPricing = true;
+  } else if (pickupDay === 5 || pickupDay === 6) { // Friday, Saturday
+    isWeekendPricing = true;
+  } else if (pickupDay === 0 && pickupHour <= 21) { // Sunday till 9pm
+    isWeekendPricing = true;
+  }
 
   let weekdayCount = 0;
   let weekendCount = 0;
+  let extraHours = 0;
   let lastDayTypeForExtraHours: "weekday" | "weekend" = "weekday";
-  let dayBreakdown: DayBreakdown[] = [];
 
-  let currentDate = new Date(pickupDateTime);
-  let totalRent = 0;
+  // Calculate full days and extra hours
+  const fullDays = Math.floor(totalHours / 24);
+  const originalExtraHours = totalHours % 24;
 
-  // Check if pickup is after 4pm (pickup day is not charged)
-  const pickupHour = pickupDateTime.getHours();
-  const isPickupAfter4PM = pickupHour >= 16;
-  
-  // Check if dropoff is before 4pm (return day is not charged)
-  const dropoffHour = dropoffDateTime.getHours();
-  const isDropoffBefore4PM = dropoffHour < 16;
+  // For 28+ hours: If there are remaining hours, count as full additional day (more than 1 day + 4hrs)
+  // For 24-28 hours: Count only full days (extra hours are charged separately)
+  const totalDaysToCharge = (totalHours >= 28 && originalExtraHours > 0) ? fullDays + 1 : fullDays;
 
-  for (let i = 0; i < fullDays; i++) {
-    const dayOfWeek = currentDate.getDay();
-    const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek];
-    const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 4;
+  // If single day booking or weekend pricing applies to all days
+  if (isWeekendPricing || totalHours <= 24) {
+    if (isWeekendPricing) {
+      weekendCount = totalDaysToCharge; // Count all days as weekend
+      lastDayTypeForExtraHours = "weekend";
+    } else {
+      weekdayCount = totalDaysToCharge; // Count all days as weekday
+      lastDayTypeForExtraHours = "weekday";
+    }
+  } else {
+    // Multi-day booking starting on weekday - combo pricing
+    let currentDate = new Date(pickupDateTime);
     
-    // Determine if this day should be charged
-    let shouldCharge = true;
-    let isPickupDay = false;
-    let isReturnDay = false;
-    let hours = 24;
-    let rate = 0;
-    let charge = 0;
-
-    // First day (pickup day)
-    if (i === 0) {
-      isPickupDay = true;
-      if (isPickupAfter4PM) {
-        // Pickup after 4pm - don't charge for pickup day
-        shouldCharge = false;
-        hours = 24 - pickupHour;
-      } else {
-        // Pickup before 4pm - charge for pickup day
-        shouldCharge = true;
-        hours = 24 - pickupHour;
-      }
-    }
-    // Last day (return day)
-    else if (i === fullDays - 1 && extraHours === 0) {
-      isReturnDay = true;
-      if (isDropoffBefore4PM) {
-        // Dropoff before 4pm - don't charge for return day
-        shouldCharge = false;
-        hours = dropoffHour;
-      } else {
-        // Dropoff after 4pm - charge for return day
-        shouldCharge = true;
-        hours = dropoffHour;
-      }
-    }
-
-    if (shouldCharge) {
-      if (isWeekday) {
+    // Count days based on totalDaysToCharge (not just fullDays)
+    for (let i = 0; i < totalDaysToCharge; i++) {
+      const dayOfWeek = currentDate.getDay();
+      
+      // Monday to Thursday = weekday, Friday to Sunday = weekend
+      if (dayOfWeek >= 1 && dayOfWeek <= 4) {
         weekdayCount++;
-        rate = 0; // Will be set by motorcycle price
       } else {
         weekendCount++;
-        rate = 0; // Will be set by motorcycle price
       }
+      
+      currentDate.setDate(currentDate.getDate() + 1);
     }
-
-    dayBreakdown.push({
-      date: currentDate.toDateString(),
-      dayName,
-      isWeekday,
-      isPickupDay,
-      isReturnDay,
-      hours,
-      rate,
-      charge,
-    });
-
-    currentDate.setDate(currentDate.getDate() + 1);
+    
+    // For 24-28 hours, determine type for extra hours
+    if (totalHours > 24 && totalHours <= 28 && originalExtraHours > 0) {
+      const extraHoursDay = currentDate.getDay();
+      lastDayTypeForExtraHours = (extraHoursDay >= 1 && extraHoursDay <= 4) ? "weekday" : "weekend";
+    }
   }
 
-  // Handle extra hours on the last day
-  if (extraHours > 0) {
-    const dayOfExtraHours = currentDate.getDay();
-    const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfExtraHours];
-    const isWeekday = dayOfExtraHours >= 1 && dayOfExtraHours <= 4;
-    
-    lastDayTypeForExtraHours = isWeekday ? "weekday" : "weekend";
-    
-    // Check if this is the return day and should be charged
-    const shouldChargeReturnDay = !isDropoffBefore4PM;
-    
-    if (shouldChargeReturnDay) {
-      if (isWeekday) {
-        weekdayCount++;
-      } else {
-        weekendCount++;
-      }
-    }
-
-    dayBreakdown.push({
-      date: currentDate.toDateString(),
-      dayName,
-      isWeekday,
-      isPickupDay: false,
-      isReturnDay: true,
-      hours: extraHours,
-      rate: 0, // Will be set by motorcycle price
-      charge: 0,
-    });
+  // Set extraHours based on the rules
+  if (totalHours >= 28) {
+    extraHours = 0; // No extra hours for 28+ hour bookings (more than 1 day + 4hrs)
+  } else if (totalHours > 24) {
+    extraHours = originalExtraHours; // Preserve extra hours for 24-28 hour bookings
+  } else {
+    extraHours = 0; // No extra hours for single day bookings
   }
 
   const days = Math.floor(totalHours / 24);
-  const hours = Math.ceil(totalHours % 24);
+  const hours = Math.ceil(extraHours);
   const duration = hours > 0 ? `${days} days ${hours} hours` : `${days} days`;
 
   return {
@@ -183,8 +142,8 @@ export const getBookingPeriod = (
     weekendCount,
     extraHours,
     lastDayTypeForExtraHours,
-    dayBreakdown,
-    totalRent,
+    dayBreakdown: [], // Simplified for this logic
+    totalRent: 0,
   };
 };
 
@@ -195,25 +154,27 @@ export const calculateRent = (
 ): number => {
   let calculatedRent = 0;
   
-  // Calculate weekday charges
-  calculatedRent += bookingPeriod.weekdayCount * weekdayRate;
-  
-  // Calculate weekend charges
-  calculatedRent += bookingPeriod.weekendCount * weekendRate;
-  
-  // Handle extra hours if any
-  if (bookingPeriod.extraHours > 0) {
-    const extraHourRate = bookingPeriod.lastDayTypeForExtraHours === "weekday" 
-      ? weekdayRate 
-      : weekendRate;
-    
-    if (bookingPeriod.extraHours >= 5) {
-      // More than 5 hours = charge full additional day
-      calculatedRent += extraHourRate;
+  // Handle 24-hour cycle billing logic
+  if (bookingPeriod.totalHours <= 24) {
+    // Single day booking (6-24 hours = 1 day rental)
+    if (bookingPeriod.weekdayCount > 0) {
+      calculatedRent = weekdayRate;
     } else {
-      // Less than 5 hours = charge hourly rate (1/24th of daily rate per hour)
-      calculatedRent += Math.ceil((extraHourRate / 24) * bookingPeriod.extraHours);
+      calculatedRent = weekendRate;
     }
+  } else if (bookingPeriod.totalHours < 28) {
+    // 24-28 hours: 1 day + extra hours (max 4 hours at 10% per hour)
+    const dailyRate = bookingPeriod.weekdayCount > 0 ? weekdayRate : weekendRate;
+    calculatedRent = dailyRate;
+    
+    // Extra hours at 10% of daily rate per hour
+    const extraHours = bookingPeriod.totalHours - 24;
+    calculatedRent += Math.ceil(extraHours) * (dailyRate * 0.10);
+    
+  } else {
+    // 28+ hours: Move to 2nd day billing - NO EXTRA HOURS, only full days (more than 1 day + 4hrs)
+    // The bookingPeriod already has correct weekdayCount and weekendCount for full days
+    calculatedRent = bookingPeriod.weekdayCount * weekdayRate + bookingPeriod.weekendCount * weekendRate;
   }
   
   return calculatedRent;
@@ -229,4 +190,5 @@ export const getTodayPrice = (motorcycle: Motorcycle) => {
   if (day >= 1 && day <= 4) return motorcycle.pricePerDayMonThu;
   else return motorcycle.pricePerDayFriSun;
 };
+
 

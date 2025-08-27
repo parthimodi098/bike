@@ -221,21 +221,13 @@ const calculateTotalCost = () => {
      motorcycle.pricePerDayFriSun
    );
    
-   // Calculate extra hours cost separately for breakdown display
-   let extraHoursCost = 0;
-   if (bookingPeriod.extraHours > 0) {
-     const extraHourRate = bookingPeriod.lastDayTypeForExtraHours === "weekday" 
-       ? motorcycle.pricePerDayMonThu 
-       : motorcycle.pricePerDayFriSun;
-     
-     if (bookingPeriod.extraHours >= 5) {
-       // More than 5 hours = charge full additional day
-       extraHoursCost = extraHourRate;
-     } else {
-       // Less than 5 hours = charge hourly rate (1/24th of daily rate per hour)
-       extraHoursCost = Math.ceil((extraHourRate / 24) * bookingPeriod.extraHours);
-     }
-   }
+     // Calculate extra hours cost separately for breakdown display
+  let extraHoursCost = 0;
+  if (bookingPeriod.extraHours > 0) {
+    const dailyRate = bookingPeriod.weekdayCount > 0 ? motorcycle.pricePerDayMonThu : motorcycle.pricePerDayFriSun;
+    // Extra hours at 10% of daily rate per hour
+    extraHoursCost = Math.ceil(bookingPeriod.extraHours) * (dailyRate * 0.10);
+  }
 
    const subtotal = calculatedRent;
    const gstRate = 0.18; // 18% GST
@@ -401,7 +393,7 @@ const calculateTotalCost = () => {
                   </div>
                   <div className="bg-gray-100 dark:bg-[#18181B] border-2 p-4 rounded-xl flex flex-row md:flex-col justify-between text-center">
                     <div className="dark:text-white text-muted-foreground">
-                      Rental Price <span className="font-bold">(Friday - Saturday)</span>
+                      Rental Price <span className="font-bold">(Friday - Sunday)</span>
                     </div>
                     <div className="font-medium">
                       ₹ {motorcycle?.pricePerDayFriSun} / day

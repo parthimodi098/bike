@@ -88,20 +88,15 @@ export const getBookingPeriod = (
   // For 24-28 hours: Count only full days (extra hours are charged separately)
   const totalDaysToCharge = (totalHours >= 28 && originalExtraHours > 0) ? fullDays + 1 : fullDays;
 
-  // If single day booking or weekend pricing applies to all days
-  if (isWeekendPricing || totalHours <= 24) {
-    if (isWeekendPricing) {
-      weekendCount = totalDaysToCharge; // Count all days as weekend
-      lastDayTypeForExtraHours = "weekend";
-    } else {
-      weekdayCount = totalDaysToCharge; // Count all days as weekday
-      lastDayTypeForExtraHours = "weekday";
-    }
+  // If pickup is Thursday after 4pm, all days are weekend pricing
+  if (isWeekendPricing) {
+    weekendCount = totalDaysToCharge; // Count all days as weekend
+    lastDayTypeForExtraHours = "weekend";
   } else {
-    // Multi-day booking starting on weekday - combo pricing
+    // Day-by-day calculation based on actual calendar days
     let currentDate = new Date(pickupDateTime);
     
-    // Count days based on totalDaysToCharge (not just fullDays)
+    // Count days based on totalDaysToCharge
     for (let i = 0; i < totalDaysToCharge; i++) {
       const dayOfWeek = currentDate.getDay();
       
@@ -116,7 +111,7 @@ export const getBookingPeriod = (
     }
     
     // For 24-28 hours, determine type for extra hours
-    if (totalHours > 24 && totalHours <= 28 && originalExtraHours > 0) {
+    if (totalHours > 24 && totalHours < 28 && originalExtraHours > 0) {
       const extraHoursDay = currentDate.getDay();
       lastDayTypeForExtraHours = (extraHoursDay >= 1 && extraHoursDay <= 4) ? "weekday" : "weekend";
     }

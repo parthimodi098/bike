@@ -224,9 +224,9 @@ const calculateTotalCost = () => {
   // Calculate extra hours cost separately for breakdown display
   let extraHoursCost = 0;
   if (bookingPeriod.extraHours > 0) {
-    // Extra hours always at 10% of weekday base price per hour
-    const weekdayBase = motorcycle.pricePerDayMonThu;
-    extraHoursCost = Math.ceil(bookingPeriod.extraHours) * (weekdayBase * 0.10);
+    // Use weekend rate for extra hours if they fall on weekend, otherwise weekday rate
+    const extraHoursBase = bookingPeriod.lastDayTypeForExtraHours === "weekend" ? motorcycle.pricePerDayFriSun : motorcycle.pricePerDayMonThu;
+    extraHoursCost = Math.ceil(bookingPeriod.extraHours) * (extraHoursBase * 0.10);
   }
 
    const subtotal = calculatedRent;
@@ -246,7 +246,7 @@ const calculateTotalCost = () => {
      gstAmount,
      totalWithGST,
      totalHours: Math.ceil(bookingPeriod.totalHours),
-     calculation: `${bookingPeriod.weekdayCount} weekday(s) × ₹${motorcycle.pricePerDayMonThu} + ${bookingPeriod.weekendCount} weekend day(s) × ₹${motorcycle.pricePerDayFriSun}${bookingPeriod.extraHours > 0 ? ` + ${Math.ceil(bookingPeriod.extraHours)} extra hour(s) × ₹${Math.round(motorcycle.pricePerDayMonThu * 0.10)}` : ''}`
+     calculation: `${bookingPeriod.weekdayCount} weekday(s) × ₹${motorcycle.pricePerDayMonThu} + ${bookingPeriod.weekendCount} weekend day(s) × ₹${motorcycle.pricePerDayFriSun}${bookingPeriod.extraHours > 0 ? ` + ${Math.ceil(bookingPeriod.extraHours)} extra hour(s) × ₹${Math.round((bookingPeriod.lastDayTypeForExtraHours === "weekend" ? motorcycle.pricePerDayFriSun : motorcycle.pricePerDayMonThu) * 0.10)}` : ''}`
    };
 
    return {

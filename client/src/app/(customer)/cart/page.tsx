@@ -119,9 +119,9 @@ export default function CartPage() {
 
     let extraHoursCharges = 0;
     if (extraHours > 0) {
-      // Extra hours always at 10% of WEEKDAY base per hour, rounded up
-      const weekdayBase = weekdayRate;
-      extraHoursCharges = Math.ceil(extraHours) * (weekdayBase * 0.10);
+      // Use weekend rate for extra hours if they fall on weekend, otherwise weekday rate
+      const extraHoursBase = lastDayTypeForExtraHours === "weekend" ? weekendRate : weekdayRate;
+      extraHoursCharges = Math.ceil(extraHours) * (extraHoursBase * 0.10);
       calculatedRent += extraHoursCharges;
     }
 

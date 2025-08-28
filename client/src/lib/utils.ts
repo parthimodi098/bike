@@ -130,10 +130,11 @@ export const calculateRent = (
     calculatedRent = bookingPeriod.weekdayCount > 0 ? weekdayRate : weekendRate;
   } else if (bookingPeriod.totalHours <= 28) {
     // 24-28 hours: 1 day + extra hours (max 4 hours at 10% per hour)
-    const dailyRate = weekdayRate; // Extra hours always at 10% of WEEKDAY base
+    // Use weekend rate for extra hours if they fall on weekend, otherwise weekday rate
+    const extraHoursDailyRate = bookingPeriod.lastDayTypeForExtraHours === "weekend" ? weekendRate : weekdayRate;
     calculatedRent = bookingPeriod.weekdayCount > 0 ? weekdayRate : weekendRate;
     const extraHours = bookingPeriod.totalHours - 24;
-    calculatedRent += Math.ceil(extraHours) * (dailyRate * 0.10);
+    calculatedRent += Math.ceil(extraHours) * (extraHoursDailyRate * 0.10);
   } else {
     // >28 hours (from 29th hour): full days only, no extra hours
     calculatedRent = bookingPeriod.weekdayCount * weekdayRate + bookingPeriod.weekendCount * weekendRate;
@@ -152,3 +153,4 @@ export const getTodayPrice = (motorcycle: Motorcycle) => {
   if (day >= 1 && day <= 4) return motorcycle.pricePerDayMonThu;
   else return motorcycle.pricePerDayFriSun;
 };
+

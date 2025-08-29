@@ -68,7 +68,7 @@ export const getBookingPeriod = (
     const h = dt.getHours();
     if (d === 4 && h >= 16) return true; // Thu 4pm+
     if (d === 5 || d === 6) return true; // Fri, Sat
-    // Sunday is considered weekday for next block
+    if (d === 0) return true; // Sunday is also weekend
     return false;
   };
 
@@ -151,6 +151,7 @@ export const getTodayPrice = (motorcycle: Motorcycle) => {
   const today = new Date();
   const day = today.getDay();
   if (day >= 1 && day <= 4) return motorcycle.pricePerDayMonThu;
-  else return motorcycle.pricePerDayFriSun;
+  else return motorcycle.pricePerDayFriSun; // Friday (5), Saturday (6), Sunday (0)
 };
+
 

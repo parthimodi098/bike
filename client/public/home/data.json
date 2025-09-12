@@ -1,0 +1,43 @@
+{
+  "availableBikes": [
+    {
+      "_id": 1,
+      "category": "SUPERBIKE",
+      "image": "/home/img16.jpg"
+    },
+    {
+      "_id": 2,
+      "category": "CRUISER",
+      "image": "/home/img17.jpg"
+    },
+    {
+      "_id": 3,
+      "category": "ADVENTURE",
+      "image": "/home/img18.jpg"
+    },
+    {
+      "_id": 4,
+      "category": "TOURING",
+      "image": "/home/img13.jpg"
+    },
+    {
+      "_id": 5,
+      "category": "SCOOTER",
+      "image": "/home/img21.jpg"
+    }
+  ],
+  "featuredBikesImages": [
+    {"brand" : "BMW", "img" : "/home/featured/bmw-seeklogo.png"},
+    {"brand" : "Hero", "img" : "/home/featured/hero-seeklogo.png"},
+    {"brand" : "Honda", "img" : "/home/featured/honda-seeklogo.png"},
+    {"brand" : "Kawasaki", "img" : "/home/featured/kawasaki-seeklogo.png"},
+    {"brand" : "KTM", "img" : "/home/featured/ktm-seeklogo.png"},
+    {"brand" : "Royal Enfield", "img" : "/home/featured/royal-enfield-seeklogo.png"},
+    {"brand" : "Suzuki", "img" : "/home/featured/suzuki-seeklogo.png"},
+    {"brand" : "Triumph", "img" : "/home/featured/triumph-motorcycles-seeklogo.png"},
+    {"brand" : "Yamaha", "img" : "/home/featured/yamaha-seeklogo.png"},
+    {"brand" : "Aprilia", "img" : "/home/featured/aprilia-seeklogo.png"},
+    {"brand" : "Bajaj", "img" : "/home/featured/bajaj-motorcycle-seeklogo.png"},
+    {"brand" : "TVS", "img" : "/home/featured/tvs-seeklogo.png"}
+  ]
+}

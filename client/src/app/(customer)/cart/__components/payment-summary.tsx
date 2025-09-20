@@ -79,19 +79,17 @@ function PaymentSummary({
           ? getFormattedAmount(calculateAdvancePayment())
           : cart?.discountedTotal;
 
-      const order = (await generateRazorpayOrder(
+      const orderResponse = (await generateRazorpayOrder(
         paymentMethod === "partial" ? "p" : "f"
-      )) as unknown as {
-        id: string;
-      };
+      )) as { order: { id: string; amount: number }; razorpayKeyId: string };
 
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: amount * 100,
+        key: orderResponse.razorpayKeyId, // Use the key from server response
+        amount: orderResponse.order.amount, // Use amount from server (already in paise)
         currency: "INR",
         name: "TORQ Rides",
         description: "Motorcycle Rental Booking",
-        order_id: order.id,
+        order_id: orderResponse.order.id,
         handler: async (response: any) => {
           try {
             const {
@@ -152,6 +150,12 @@ function PaymentSummary({
 
       const razorpay = new (window as any).Razorpay(options);
       razorpay.on("payment.failed", (response: any) => {
+        console.error("PAYMENT FAILED DEBUG:", response);
+        console.error("Error description:", response.error?.description);
+        console.error("Error code:", response.error?.code);
+        console.error("Error source:", response.error?.source);
+        console.error("Error step:", response.error?.step);
+        console.error("Error reason:", response.error?.reason);
         setErrorMessage(response.error.description || "Payment failed");
         setPaymentState("failed");
       });
@@ -433,3 +437,4 @@ function PaymentSummary({
 }
 
 export default PaymentSummary;
+

@@ -102,7 +102,7 @@ interface BookingState {
   deleteBookingByAdmin: (bookingId: string) => Promise<void>;
 
   // Payment Functions :
-  generateRazorpayOrder: (mode: string, bookingId?: string) => Promise<void>;
+  generateRazorpayOrder: (mode: string, bookingId?: string) => Promise<{ order: any; razorpayKeyId: string; }>;
   verifyRazorpayPayment: (data: {
     razorpay_payment_id: string;
     razorpay_signature: string;
@@ -295,7 +295,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const response = await bookingAPI.generateRazorpayOrder(mode, bookingId);
-      const { order, booking } = response.data.data;
+      const { order, booking, razorpayKeyId } = response.data.data;
       set((state) => {
         if (bookingId) {
           return {
@@ -311,7 +311,8 @@ export const useBookingStore = create<BookingState>((set, get) => ({
           };
         }
       });
-      return order;
+      // Return both order and razorpayKeyId
+      return { order, razorpayKeyId };
     } catch (error: AxiosError | any) {
       set({
         loading: false,
@@ -409,3 +410,4 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     }
   },
 }));
+

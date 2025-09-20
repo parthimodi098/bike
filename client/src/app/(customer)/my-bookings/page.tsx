@@ -128,20 +128,18 @@ export default function MyBookingsPage() {
 
       const amount = booking.remainingAmount;
 
-      const order = (await generateRazorpayOrder(
+      const orderResponse = (await generateRazorpayOrder(
         paymentMethod === "partial" ? "p" : "f",
         booking._id
-      )) as unknown as {
-        id: string;
-      };
+      )) as { order: { id: string }; razorpayKeyId: string };
 
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        key: orderResponse.razorpayKeyId, // Use the key from server response
         amount: amount * 100,
         currency: "INR",
         name: "TORQ Rides",
         description: "Motorcycle Rental Booking",
-        order_id: order.id,
+        order_id: orderResponse.order.id,
         handler: async (response: any) => {
           try {
             const {
@@ -590,3 +588,4 @@ export default function MyBookingsPage() {
     </div>
   );
 }
+

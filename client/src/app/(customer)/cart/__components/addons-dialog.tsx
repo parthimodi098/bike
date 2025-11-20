@@ -111,8 +111,7 @@ export function AddonsDialog({
         <DialogHeader>
           <DialogTitle>Select Riding Gear & Accessories</DialogTitle>
           <DialogDescription>
-            Choose the gear and accessories you need for your ride. These are
-            complimentary and will be included in your booking confirmation.
+            Choose the gear and accessories you need for your ride.
           </DialogDescription>
         </DialogHeader>
 
